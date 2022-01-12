@@ -1,10 +1,11 @@
 from django.shortcuts import get_object_or_404
-from rest_framework import filters, permissions, viewsets
+from rest_framework import filters, viewsets
 from rest_framework.pagination import LimitOffsetPagination
 from rest_framework.response import Response
 
-from posts.models import Follow, Group, Post
+from posts.models import Group, Post
 
+from .mixins import CreateListViewSet
 from .permissions import IsAuthorOrReadOnlyPermission
 from .serializers import (
     CommentSerializer, FollowSerializer, GroupSerializer, PostSerializer,
@@ -20,6 +21,9 @@ class PostViewSet(viewsets.ModelViewSet):
     serializer_class = PostSerializer
     pagination_class = LimitOffsetPagination
     permission_classes = (IsAuthorOrReadOnlyPermission,)
+
+    def perform_destroy(self, instance):
+        return super().perform_destroy(instance)
 
     def retrieve(self, request, *args, **kwargs):
         instance = self.get_object()
@@ -38,6 +42,7 @@ class GroupViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = Group.objects.all()
     serializer_class = GroupSerializer
     pagination_class = LimitOffsetPagination
+    permission_classes = (IsAuthorOrReadOnlyPermission,)
 
 
 class CommentViewSet(viewsets.ModelViewSet):
@@ -55,18 +60,13 @@ class CommentViewSet(viewsets.ModelViewSet):
         serializer.save(author=self.request.user)
 
 
-class FollowViewSet(viewsets.ModelViewSet):
+class FollowViewSet(CreateListViewSet):
     """Получаем и показываем, на кого подписались.
     Доступно только для авторизованного пользователя.
     """
     serializer_class = FollowSerializer
-    permission_classes = (permissions.IsAuthenticated,)
     filter_backends = (filters.SearchFilter,)
     search_fields = ('=following__username',)
 
     def get_queryset(self):
-        follow = Follow.objects.filter(user=self.request.user)
-        return follow
-
-    def perform_create(self, serializer):
-        serializer.save(user=self.request.user)
+        return self.request.user.follower.all()
