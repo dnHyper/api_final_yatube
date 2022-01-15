@@ -1,7 +1,6 @@
 from django.shortcuts import get_object_or_404
 from rest_framework import filters, viewsets
 from rest_framework.pagination import LimitOffsetPagination
-from rest_framework.response import Response
 
 from posts.models import Group, Post
 
@@ -17,18 +16,10 @@ class PostViewSet(viewsets.ModelViewSet):
     Работает с пагинацией.
     Позволяет только автору удалять/редактировать свои записи.
     """
-    queryset = Post.objects.all()
+    queryset = Post.objects.select_related("group", "author")
     serializer_class = PostSerializer
     pagination_class = LimitOffsetPagination
     permission_classes = (IsAuthorOrReadOnlyPermission,)
-
-    def perform_destroy(self, instance):
-        return super().perform_destroy(instance)
-
-    def retrieve(self, request, *args, **kwargs):
-        instance = self.get_object()
-        serializers = self.get_serializer(instance)
-        return Response(serializers.data)
 
     def perform_create(self, serializer):
         serializer.save(author=self.request.user)
